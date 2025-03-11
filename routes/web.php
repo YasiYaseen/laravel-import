@@ -23,6 +23,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/import/laravel-excel', [CustomerImportController::class, 'importLaravelExcel']);
     Route::post('/import/fast-excel', [CustomerImportController::class, 'importFastExcel']);
     Route::post('/import/openspout', [CustomerImportController::class, 'importOpenSpout']);
+    // Row Count Routes
+    Route::post('/count-rows/spatie', [CustomerImportController::class, 'countRowsSpatie']);
+    Route::post('/count-rows/laravel-excel', [CustomerImportController::class, 'countRowsLaravelExcel']);
+    Route::post('/count-rows/fast-excel', [CustomerImportController::class, 'countRowsFastExcel']);
+    Route::post('/count-rows/openspout', [CustomerImportController::class, 'countRowsOpenSpout']);
 
 });
 

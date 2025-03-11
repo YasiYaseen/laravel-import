@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Imports\CustomersImport;
 use Illuminate\Http\Request;
 use App\Models\Customer;
+use Exception;
 use Generator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Spatie\SimpleExcel\SimpleExcelReader;
 use Rap2hpoutre\FastExcel\FastExcel;
 use Maatwebsite\Excel\Facades\Excel;
@@ -98,22 +100,11 @@ class CustomerImportController extends Controller
 
         $reader = new XlsxReader();
         $reader->open($file->path());
-        dd(get_class_methods($reader));
         $data = [];
         foreach ($reader->getSheetIterator() as $sheet) {
 
             foreach ($this->generateRows($sheet) as $rowData) {
-                $customer = Customer::create([
-                    'first_name' => $rowData[1] ?? null,
-                    'last_name'  => $rowData[2] ?? null,
-                    'email'      => $rowData[3] ?? null,
-                    'gender'     => $rowData[4] ?? null,
-                    'phone'      => $rowData[5] ?? null,
-                    'country'    => $rowData[6] ?? null,
-                    'city'       => $rowData[7] ?? null,
-                ]);
-
-                unset($customer); // Remove reference to free memory
+                // dd($rowData);
 
             }
         }
@@ -131,18 +122,117 @@ class CustomerImportController extends Controller
     {
         $rowCount = 0;
         foreach ($sheet->getRowIterator() as $row) {
+            $rowData = $row->toArray();
 
-            if (++$rowCount == 1) {
+            if ($rowCount === 0) {
+                // First row → Store headers
+                $headers = array_map('trim', $rowData);
+                $rowCount++;
                 continue;
             }
-            yield $row->toArray();
+           // Ensure we only take data where headers exist
+            $filteredData = [];
+            foreach ($headers as $index => $header) {
+                if (!empty($header)) {
+                    $filteredData[$header] = $rowData[$index] ?? null;
+                }
+            }
 
+            yield $filteredData;
+
+            $rowCount++;
+
+            // Free memory every 1000 rows
             if ($rowCount % 1000 === 0) {
                 gc_collect_cycles();
             }
-
         }
     }
+    //
+    public function countRowsSpatie(Request $request)
+    {
+        $file = $request->file('file');
+        $fileType = $this->detectFileType($file);
+
+        if (!$fileType) {
+            return response()->json(['message' => 'Unsupported file format.'], 400);
+        }
+
+        $start = microtime(true);
+        $rowCount = SimpleExcelReader::create($file, $fileType)->getRows()->count();
+        $executionTime = round(microtime(true) - $start, 2);
+
+        return response()->json([
+            'library' => 'Spatie Simple Excel',
+            'rows' => $rowCount,
+            'time' => $executionTime
+        ]);
+    }
+
+    public function countRowsLaravelExcel(Request $request)
+    {
+        $file = $request->file('file');
+
+        $start = microtime(true);
+        $rowCount = Excel::toCollection(new CustomersImport, $file)->first()->count();
+        $executionTime = round(microtime(true) - $start, 2);
+
+        return response()->json([
+            'library' => 'Laravel Excel',
+            'rows' => $rowCount,
+            'time' => $executionTime
+        ]);
+    }
+
+    public function countRowsFastExcel(Request $request)
+    {
+        $file = $request->file('file');
+        $fileType = $this->detectFileType($file);
+
+        if (!$fileType) {
+            return response()->json(['message' => 'Unsupported file format.'], 400);
+        }
+
+        $start = microtime(true);
+        $rowCount = count((new FastExcel)->import($file->path()));
+        $executionTime = round(microtime(true) - $start, 2);
+
+        return response()->json([
+            'library' => 'Fast Excel',
+            'rows' => $rowCount,
+            'time' => $executionTime
+        ]);
+    }
+
+    public function countRowsOpenSpout(Request $request)
+    {
+        $file = $request->file('file');
+        $fileType = $this->detectFileType($file);
+
+        if (!$fileType) {
+            return response()->json(['message' => 'Unsupported file format.'], 400);
+        }
+
+        $start = microtime(true);
+        $reader = new XlsxReader();
+        $reader->open($file->path());
+
+        $rowCount = 0;
+        foreach ($reader->getSheetIterator() as $sheet) {
+            $rowCount = iterator_count($sheet->getRowIterator());
+            break;
+        }
+
+        $reader->close();
+        $executionTime = round(microtime(true) - $start, 2);
+
+        return response()->json([
+            'library' => 'OpenSpout',
+            'rows' => $rowCount,
+            'time' => $executionTime
+        ]);
+    }
+
 
 
 }

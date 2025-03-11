@@ -17,7 +17,10 @@
             <option value="openspout">OpenSpout</option>
         </select>
         <button type="submit">Import</button>
+        <button type="button" id="countRowsBtn">Count Rows</button>
     </form>
+
+    <h3>Import Result</h3>
     <p id="result"></p>
 
     <script>
@@ -33,7 +36,25 @@
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById("result").innerText = `Library: ${data.library}\nTime: ${data.time} sec\nMemory: ${data.memory} bytes`;
+                document.getElementById("result").innerText =
+                    `Library: ${data.library}\nRows: ${data.rows}\nTime: ${data.time} sec\nMemory: ${data.memory} bytes`;
+            })
+            .catch(error => console.error("Error:", error));
+        });
+
+        document.getElementById("countRowsBtn").addEventListener("click", function() {
+            let formData = new FormData(document.getElementById("importForm"));
+            let method = formData.get("method");
+            let url = "/count-rows/" + method;
+
+            fetch(url, {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText =
+                    `Library: ${data.library}\nTotal Rows: ${data.rows}\nTime: ${data.time} sec\nMemory: ${data.memory} bytes`;
             })
             .catch(error => console.error("Error:", error));
         });
